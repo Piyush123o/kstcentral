@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>Customer Book</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <!-- LOGIN -->
+  <section id="login-view" class="login hidden">
+    <form id="login-form" class="login-card" autocomplete="on">
+      <h1>📒 Customer Book</h1>
+      <p class="muted">Please log in to continue</p>
+      <label>Username or email
+        <input id="login-user" required autocapitalize="none" autocomplete="username">
+      </label>
+      <label>Password
+        <input id="login-pass" type="password" required autocomplete="current-password">
+      </label>
+      <p id="login-error" class="error" role="alert" aria-live="polite"></p>
+      <button class="btn primary" type="submit">Login</button>
+    </form>
+  </section>
+
+  <!-- APP -->
+  <div id="app-view" class="hidden">
+    <header class="topbar">
+      <h1>📒 Customer Book</h1>
+      <nav class="tabs">
+        <button data-tab="customers" class="tab active" type="button">Customers</button>
+        <button data-tab="add" class="tab" type="button">+ Add</button>
+        <button data-tab="settings" class="tab" type="button">Settings</button>
+      </nav>
+    </header>
+
+    <div id="setup-banner" class="banner hidden" role="alert">
+      Supabase setup needs attention. Check config.js and the browser console.
+    </div>
+
+    <main>
+      <section id="tab-customers">
+        <div id="due-box" class="due hidden">
+          <h2>🔔 Follow-ups due today <span id="due-count" class="pill"></span></h2>
+          <div id="due-list"></div>
+        </div>
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="Search name, number, info…">
+          <select id="f-status"><option value="">All status</option></select>
+          <select id="f-tag"><option value="">All tags</option></select>
+          <select id="sort">
+            <option value="newest">Newest first</option>
+            <option value="az">A – Z</option>
+            <option value="last">Last contacted</option>
+            <option value="stale">Not contacted in 30 days</option>
+          </select>
+        </div>
+        <p id="count-line" class="muted small"></p>
+        <div id="list" class="list"></div>
+      </section>
+
+      <section id="tab-add" class="hidden">
+        <form id="add-form" class="card form">
+          <h2>Add customer</h2>
+          <label>Contact number
+            <input id="a-phone" inputmode="tel" required placeholder="e.g. 98765 43210">
+          </label>
+          <div id="dup-msg" class="dup hidden"></div>
+          <label>Name<input id="a-name" required></label>
+          <label>Info / notes<textarea id="a-info" rows="3" placeholder="Address, what they buy, anything useful"></textarea></label>
+          <div class="row">
+            <label>Status<select id="a-status"></select></label>
+            <label>Tags (comma separated)<input id="a-tags" placeholder="Wholesale, Mumbai"></label>
+          </div>
+          <button class="btn primary" type="submit">Save customer</button>
+        </form>
+      </section>
+
+      <section id="tab-settings" class="hidden">
+        <div class="card">
+          <h2>WhatsApp message templates</h2>
+          <p class="muted small">Use <code>{name}</code> to insert the customer's name.</p>
+          <form id="tpl-form" class="form">
+            <input id="t-id" type="hidden">
+            <label>Title<input id="t-title" required placeholder="Greeting"></label>
+            <label>Message<textarea id="t-body" rows="3" required placeholder="Hello {name}, ..."></textarea></label>
+            <div class="row">
+              <button class="btn primary" type="submit" id="t-save">Add template</button>
+              <button class="btn" type="button" id="t-cancel">Clear</button>
+            </div>
+          </form>
+          <div id="tpl-list"></div>
+        </div>
+        <div class="card">
+          <h2>Default country code</h2>
+          <p class="muted small">Added to 10-digit numbers when opening WhatsApp. India = 91.</p>
+          <div class="row">
+            <input id="cc" inputmode="numeric" style="max-width:120px">
+            <button class="btn" id="cc-save" type="button">Save</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Backup &amp; import</h2>
+          <div class="row wrap">
+            <button class="btn" id="exp-xlsx" type="button">⬇ Export Excel</button>
+            <button class="btn" id="exp-csv" type="button">⬇ Export CSV</button>
+            <label class="btn file">⬆ Import Excel / CSV<input id="imp-file" type="file" accept=".xlsx,.xls,.csv" hidden></label>
+          </div>
+          <p class="muted small">Import columns recognised: <b>Name, Phone</b> (or Contact / Mobile), <b>Info</b> (or Notes), Status, Tags. Numbers already in the book are skipped.</p>
+          <p id="imp-result" class="small"></p>
+        </div>
+        <div class="card"><button class="btn danger" id="logout" type="button">Logout</button></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <button class="modal-x" id="modal-x" aria-label="Close" type="button">×</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- Load dependencies first, then config, then the app. Keep this order. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="./config.js?v=2"></script>
+  <script src="./app.js?v=2"></script>
+</body>
+</html>
