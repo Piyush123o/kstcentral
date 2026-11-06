@@ -381,6 +381,51 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .bulk-progress { margin:12px 0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
 .bulk-preview { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
 
+  
+/* Touch-device card actions: keep action buttons hidden until a horizontal swipe.
+   This uses pointer capability as well as viewport width, so mobile browsers
+   that report a desktop-like CSS width still get the swipe interaction. */
+@media (hover: none), (pointer: coarse) {
+  #list .cust .actions,
+  #due-list .cust .actions {
+    display: none !important;
+  }
+
+  #list .cust.swipe-open .actions,
+  #due-list .cust.swipe-open .actions {
+    display: flex !important;
+    animation: fade-in .15s ease;
+  }
+
+  #list .cust .swipe-hint,
+  #due-list .cust .swipe-hint {
+    display: block;
+  }
+
+  #list .cust.swipe-open .swipe-hint,
+  #due-list .cust.swipe-open .swipe-hint {
+    display: none;
+  }
+
+  #list .cust,
+  #due-list .cust {
+    touch-action: pan-y;
+  }
+}
+
+/* Also cover narrow mobile layouts if the device reports a fine pointer. */
+@media (max-width: 760px) {
+  #list .cust .actions,
+  #due-list .cust .actions {
+    display: none !important;
+  }
+
+  #list .cust.swipe-open .actions,
+  #due-list .cust.swipe-open .actions {
+    display: flex !important;
+  }
+}
+
   </style>
 </head>
 <body>
