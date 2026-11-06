@@ -253,6 +253,40 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 @media (max-width: 480px) { .db-row { flex-direction: column; align-items: stretch; } }
 @media (max-width: 400px) { .db-chip-label { display: none; } .db-chip { padding: 4px 10px; } }
 
+/* ---------- Database details panel ---------- */
+.db-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.db-modal { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; overflow-y: auto; padding: 20px; background: rgba(17, 24, 39, .5); }
+.db-modal-box { position: relative; width: min(100%, 460px); max-height: min(90vh, 760px); overflow-y: auto; padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); animation: pop .16s ease; }
+.db-modal-box h2 { padding-right: 32px; margin-bottom: 14px; }
+.db-modal-x { position: absolute; top: 14px; right: 14px; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 22px; line-height: 1; }
+.db-modal-x:hover { color: var(--text); background: var(--surface-2); }
+.db-pop-status { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.db-sub { margin: 20px 0 10px; font-size: 13px; font-weight: 650; color: var(--text-2); }
+.db-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.db-bar > span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.db-bar.warn > span { background: var(--s-warn); }
+.db-bar.bad > span { background: var(--s-bad); }
+.db-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.db-stat { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.db-stat b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.db-stat span { color: var(--muted); font-size: 12px; }
+.db-foot { margin: 10px 0 0; }
+.db-note { margin: 0 0 10px; }
+.db-sql { margin: 8px 0 10px; padding: 12px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; color: var(--text-2); background: var(--surface-2); font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+.db-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--text-2); font-size: 13.5px; }
+.db-meta b { color: var(--text); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.db-limit { margin-top: 18px; }
+.db-pop-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+@media (max-width: 480px) {
+  .db-actions { width: 100%; }
+  .db-actions .btn { flex: 1 1 auto; }
+  .db-modal { align-items: end; padding: 0; }
+  .db-modal-box { width: 100%; max-height: 92vh; padding: 22px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+  .db-pop-actions .btn { width: 100%; }
+  .db-stats { gap: 8px; }
+  .db-stat { padding: 9px 10px; }
+}
+
 /* ---------- Responsive ---------- */
 @media (min-width: 900px) { #tab-add .card { padding: 28px; } }
 
@@ -352,7 +386,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
         </button>
       </nav>
 
-      <button id="db-chip" class="db-chip" type="button" data-state="checking" aria-label="Database status: checking. Tap to recheck." title="Recheck database connection">
+      <button id="db-chip" class="db-chip" type="button" data-state="checking" aria-label="Database status: checking. Tap for details." title="Database status and storage">
         <span class="db-dot" aria-hidden="true"></span>
         <span class="db-chip-label" id="db-chip-label">Checking…</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
@@ -446,8 +480,12 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
                 <div class="muted small" id="db-detail">Contacting the database…</div>
               </div>
             </div>
-            <button class="btn" id="db-recheck" type="button">↻ Recheck connection</button>
+            <div class="db-actions">
+              <button class="btn" id="db-details" type="button">Storage details</button>
+              <button class="btn" id="db-recheck" type="button">↻ Recheck</button>
+            </div>
           </div>
+          <div class="db-meta"><span>Total customers</span><b id="db-count">—</b></div>
         </div>
 
         <div class="card">
@@ -514,6 +552,36 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
       <div id="modal-body"></div>
     </div>
   </div>
+  <!-- Database details panel -->
+  <div id="db-modal" class="db-modal hidden" data-state="checking">
+    <div class="db-modal-box" role="dialog" aria-modal="true" aria-labelledby="db-modal-title">
+      <button class="db-modal-x" id="db-modal-x" type="button" aria-label="Close">×</button>
+      <h2 id="db-modal-title">Database</h2>
+
+      <div class="db-state db-pop-status">
+        <span class="db-dot" aria-hidden="true"></span>
+        <div>
+          <div class="db-label" id="db-pop-label">Checking…</div>
+          <div class="muted small" id="db-pop-detail"></div>
+        </div>
+      </div>
+
+      <div class="db-meta"><span>Total customers</span><b id="db-pop-count">—</b></div>
+
+      <h3 class="db-sub">Storage</h3>
+      <div id="db-usage"></div>
+
+      <label class="db-limit">Plan storage limit (MB)
+        <input id="db-limit" type="number" min="1" step="1" inputmode="numeric" placeholder="500">
+        <span class="hint">Used to work out available space. Supabase Free = 500 MB.</span>
+      </label>
+
+      <div class="db-pop-actions">
+        <button class="btn primary" id="db-pop-recheck" type="button">↻ Recheck</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <!-- Load dependencies first, then config, then the app. Keep this order. -->
@@ -529,15 +597,17 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
     var chip = document.getElementById('db-chip'), card = document.getElementById('db-card');
     var chipLabel = document.getElementById('db-chip-label');
     var label = document.getElementById('db-label'), detail = document.getElementById('db-detail');
-    var btn = document.getElementById('db-recheck');
+    var btn = document.getElementById('db-recheck'), popBtn = document.getElementById('db-pop-recheck');
+    var popLabel = document.getElementById('db-pop-label'), popDetail = document.getElementById('db-pop-detail'), popBox = document.getElementById('db-modal');
     var cfg = null, running = false;
 
     function set(state, text, msg) {
       chip.dataset.state = state; card.dataset.state = state;
       chipLabel.textContent = text; label.textContent = text;
       detail.textContent = msg;
-      chip.setAttribute('aria-label', 'Database status: ' + text + '. Tap to recheck.');
-      btn.disabled = chip.disabled = (state === 'checking');
+      popBox.dataset.state = state; popLabel.textContent = text; popDetail.textContent = msg;
+      chip.setAttribute('aria-label', 'Database status: ' + text + '. Tap for details.');
+      btn.disabled = popBtn.disabled = (state === 'checking');
     }
 
     /* Find the Supabase URL + key without touching app.js / config.js.
@@ -577,9 +647,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
     }
 
     function check() {
-      if (running) return; running = true;
+      if (running) return Promise.resolve(); running = true;
       set('checking', 'Checking…', 'Contacting the database…');
-      getConfig().then(function (c) {
+      return getConfig().then(function (c) {
         if (!c) return set('warn', 'Not set up', 'Could not find the Supabase URL and key in config.js.');
         if (!navigator.onLine) return set('error', 'Offline', 'This device has no internet connection.');
         var ctrl = new AbortController(), t0 = performance.now();
@@ -587,7 +657,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
         return fetch(c.url.replace(/\/$/, '') + '/auth/v1/health', { headers: { apikey: c.key }, cache: 'no-store', signal: ctrl.signal })
           .then(function (r) {
             var ms = Math.round(performance.now() - t0), when = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            if (r.ok) set('ok', 'Connected', 'Responded in ' + ms + ' ms · checked at ' + when);
+            if (r.ok) { set('ok', 'Connected', 'Responded in ' + ms + ' ms · checked at ' + when); loadCount(); }
             else if (r.status === 401 || r.status === 403) set('error', 'Key rejected', 'The server is reachable but refused the API key (HTTP ' + r.status + '). Check config.js.');
             else set('error', 'Server error', 'The database responded with HTTP ' + r.status + '. The project may be paused or down.');
           })
@@ -599,8 +669,135 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
       }).then(function () { running = false; }, function () { running = false; });
     }
 
-    chip.addEventListener('click', check);
     btn.addEventListener('click', check);
+
+    /* ---------- Storage details panel ---------- */
+    var modal = document.getElementById('db-modal'), usage = document.getElementById('db-usage');
+    var limitInput = document.getElementById('db-limit'), lastUsed = null;
+    var SQL = [
+      'create or replace function public.get_db_usage()',
+      'returns bigint',
+      'language sql',
+      'security definer',
+      'set search_path = public',
+      'as $$ select pg_database_size(current_database())::bigint; $$;',
+      '',
+      'revoke all on function public.get_db_usage() from public;',
+      'grant execute on function public.get_db_usage() to authenticated;'
+    ].join('\n');
+
+    try { limitInput.value = localStorage.getItem('cb_db_limit_mb') || ((window.DB_STATUS_CONFIG && window.DB_STATUS_CONFIG.limitMB) || 500); }
+    catch (e) { limitInput.value = 500; }
+
+    function fmt(b) {
+      var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+      while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+      return (i === 0 ? Math.round(b) : b.toFixed(b >= 100 ? 0 : 1)) + ' ' + u[i];
+    }
+    function limitBytes() { var mb = parseFloat(limitInput.value); return (mb > 0 ? mb : 500) * 1048576; }
+    function stat(k, v) { return '<div class="db-stat"><b>' + v + '</b><span>' + k + '</span></div>'; }
+
+    function renderUsage(used) {
+      var lim = limitBytes(), avail = Math.max(lim - used, 0), pct = Math.min(used / lim * 100, 100);
+      usage.innerHTML =
+        '<div class="db-bar ' + (pct >= 90 ? 'bad' : pct >= 75 ? 'warn' : '') + '"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+        '<div class="db-stats">' + stat('Used', fmt(used)) + stat('Available', fmt(avail)) + stat('Total', fmt(lim)) + '</div>' +
+        '<p class="muted small db-foot">' + pct.toFixed(1) + '% of plan storage used</p>';
+    }
+    function usageMsg(title, text, showSql) {
+      usage.innerHTML = '<p class="db-note"><b></b><br><span class="muted small"></span></p>';
+      usage.querySelector('b').textContent = title;
+      usage.querySelector('span').textContent = text;
+      if (!showSql) return;
+      var pre = document.createElement('pre'); pre.className = 'db-sql'; pre.textContent = SQL;
+      var copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn sm'; copy.textContent = 'Copy SQL';
+      copy.onclick = function () {
+        if (navigator.clipboard) navigator.clipboard.writeText(SQL).then(function () { copy.textContent = 'Copied ✓'; setTimeout(function () { copy.textContent = 'Copy SQL'; }, 1500); });
+      };
+      usage.appendChild(pre); usage.appendChild(copy);
+    }
+    function authToken() {
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (/^sb-.+-auth-token$/.test(k)) {
+            var v = JSON.parse(localStorage.getItem(k));
+            var t = v && (v.access_token || (v.currentSession && v.currentSession.access_token));
+            if (t) return t;
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+    function loadUsage() {
+      usage.innerHTML = '<p class="muted small">Loading storage…</p>';
+      return getConfig().then(function (c) {
+        if (!c) return usageMsg('Not set up', 'Could not find the Supabase URL and key.', false);
+        return fetch(c.url.replace(/\/$/, '') + '/rest/v1/rpc/get_db_usage', {
+          method: 'POST', cache: 'no-store', body: '{}',
+          headers: { apikey: c.key, Authorization: 'Bearer ' + (authToken() || c.key), 'Content-Type': 'application/json' }
+        }).then(function (r) {
+          if (r.ok) return r.json().then(function (n) {
+            var used = Number(n);
+            if (!isFinite(used)) return usageMsg('Unexpected response', 'The database returned an unreadable size.', true);
+            lastUsed = used; renderUsage(used);
+          });
+          if (r.status === 404) return usageMsg('Storage info not enabled', 'One-time setup: run this SQL in Supabase → SQL Editor, then press Recheck.', true);
+          if (r.status === 401 || r.status === 403) return usageMsg('Not allowed', 'Log in first, or run this SQL so logged-in users can read the storage size.', true);
+          usageMsg('Could not read storage', 'The database responded with HTTP ' + r.status + '.', false);
+        });
+      }).catch(function () { usageMsg('Could not read storage', 'Check your connection and try again.', false); });
+    }
+    function openPanel() {
+      modal.classList.remove('hidden');
+      document.getElementById('db-modal-x').focus();
+      check().then(loadUsage);
+    }
+    function closePanel() { modal.classList.add('hidden'); chip.focus(); }
+
+    /* ---------- Total customers ---------- */
+    var countEls = [document.getElementById('db-count'), document.getElementById('db-pop-count')], table = null;
+    function setCount(v, tip) { countEls.forEach(function (e) { e.textContent = v; e.title = tip || ''; }); }
+    function getTable() {
+      if (table) return Promise.resolve(table);
+      var o = window.DB_STATUS_CONFIG;
+      if (o && o.table) return Promise.resolve(table = o.table);
+      return fetch('./app.js', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+        var names = [], re = /\.from\(\s*['"`]([\w.-]+)['"`]\s*\)/g, m;
+        while ((m = re.exec(t))) if (names.indexOf(m[1]) < 0) names.push(m[1]);
+        var pick = names.filter(function (n) { return /customer|client|contact/i.test(n); })[0] || names[0];
+        return (table = pick || 'customers');
+      }).catch(function () { return (table = 'customers'); });
+    }
+    function loadCount() {
+      return Promise.all([getConfig(), getTable()]).then(function (a) {
+        var c = a[0], t = a[1];
+        if (!c) return setCount('—');
+        return fetch(c.url.replace(/\/$/, '') + '/rest/v1/' + encodeURIComponent(t) + '?select=*', {
+          method: 'HEAD', cache: 'no-store',
+          headers: { apikey: c.key, Authorization: 'Bearer ' + (authToken() || c.key), Prefer: 'count=exact' }
+        }).then(function (r) {
+          if (!r.ok) return setCount('—', (r.status === 401 || r.status === 403) ? 'Log in to see the count' : 'Could not read table "' + t + '" (HTTP ' + r.status + ')');
+          var m = (r.headers.get('Content-Range') || '').match(/\/(\d+)$/);
+          setCount(m ? Number(m[1]).toLocaleString() : '—', 'Rows in "' + t + '"');
+        });
+      }).catch(function () { setCount('—'); });
+    }
+    var addForm = document.getElementById('add-form');
+    if (addForm) addForm.addEventListener('submit', function () { setTimeout(loadCount, 1500); });
+
+    limitInput.addEventListener('change', function () {
+      try { localStorage.setItem('cb_db_limit_mb', limitInput.value); } catch (e) {}
+      if (lastUsed !== null) renderUsage(lastUsed);
+    });
+    document.getElementById('db-pop-recheck').addEventListener('click', function () { check().then(loadUsage); });
+    document.getElementById('db-modal-x').addEventListener('click', closePanel);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closePanel(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closePanel(); });
+    document.getElementById('db-details').addEventListener('click', openPanel);
+    chip.addEventListener('click', openPanel);
+
+
     window.addEventListener('online', check);
     window.addEventListener('offline', check);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
