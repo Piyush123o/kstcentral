@@ -55,8 +55,7 @@
   --nav-h: 64px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+:root[data-theme="dark"] {
     --bg: #0f1115;
     --surface: #171a20;
     --surface-2: #1c2027;
@@ -83,7 +82,6 @@
     --s-warn: #fcd34d; --s-warn-bg: rgba(252, 211, 77, .10);  --s-warn-line: rgba(252, 211, 77, .30);
     --s-ok:   #6ee7a0; --s-ok-bg:   rgba(74, 222, 128, .10);  --s-ok-line:   rgba(74, 222, 128, .30);
     --s-bad:  #fca5a5; --s-bad-bg:  rgba(248, 113, 113, .10); --s-bad-line:  rgba(248, 113, 113, .32);
-  }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -357,6 +355,32 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   .topbar { padding: 0 max(24px, calc((100vw - 1240px) / 2)); }
 }
 
+
+/* Manual theme switch */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+.theme-toggle { align-self: center; min-height: 34px; padding: 6px 10px; }
+.list-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; }
+.list-toolbar #count-line { margin:0 2px; }
+.swipe-hint { display:none; color:var(--muted); font-size:11px; margin-top:8px; }
+@media (max-width: 700px) {
+  .topbar { gap:8px; padding-inline:12px; flex-wrap:wrap; }
+  .topbar .brand { flex:1 1 auto; }
+  .topbar .tabs { order:3; width:100%; justify-content:space-around; min-height:48px; }
+  .topbar .tab { padding:0 9px; font-size:12px; }
+  #db-chip { display:none; }
+  .theme-toggle { font-size:12px; min-height:32px; }
+  .list-toolbar { align-items:flex-start; flex-direction:column; }
+  .list-toolbar .btn { width:100%; }
+  .cust { touch-action:pan-y; }
+  .cust .actions { display:none; }
+  .cust.swipe-open .actions { display:flex; animation:fade-in .15s ease; }
+  .cust .swipe-hint { display:block; }
+  .cust.swipe-open .swipe-hint { display:none; }
+}
+.bulk-progress { margin:12px 0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
+.bulk-preview { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
+
   </style>
 </head>
 <body>
@@ -420,6 +444,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
         </button>
       </nav>
 
+      <button id="theme-toggle" class="btn theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch theme">☾ Dark</button>
       <button id="db-chip" class="db-chip" type="button" data-state="checking" aria-label="Database status: checking. Tap for details." title="Database status and storage">
         <span class="db-dot" aria-hidden="true"></span>
         <span class="db-chip-label" id="db-chip-label">Checking…</span>
@@ -457,7 +482,10 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
           </div>
         </div>
 
-        <p id="count-line" class="muted small"></p>
+        <div class="list-toolbar">
+          <p id="count-line" class="muted small"></p>
+          <button class="btn wa" id="bulk-wa" type="button">💬 Message filtered group</button>
+        </div>
         <div id="list" class="list" aria-live="polite"></div>
       </section>
 
@@ -525,7 +553,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
         <div class="card">
           <div class="card-head">
             <h2>WhatsApp message templates</h2>
-            <p class="muted small">Use <code>{name}</code> to insert the customer's name.</p>
+            <p class="muted small">Personalize messages with {name}, {first_name}, {phone}, {status}, {info}, {tags}, {followup_date}, {last_contacted}, and {today}. Variables are case-insensitive.</p>
           </div>
           <form id="tpl-form" class="form">
             <input id="t-id" type="hidden">
@@ -622,7 +650,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="./config.js?v=2"></script>
-  <script src="./app.js?v=2"></script>
+  <script src="./app.js?v=3"></script>
 
   <!-- Database connection status (standalone; does not modify app.js) -->
   <script>
