@@ -8,6 +8,18 @@
   <meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
   <meta name="description" content="A simple, modern customer management workspace.">
   <title>Customer Book</title>
+  <script>
+    /* collect load/runtime errors so a blank screen can explain itself */
+    window.__bootErrors = [];
+    window.addEventListener('error', function (e) {
+      var t = e.target;
+      if (t && t !== window && (t.src || t.href)) window.__bootErrors.push('Failed to load: ' + (t.src || t.href));
+      else window.__bootErrors.push((e.message || 'Script error') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      window.__bootErrors.push('Unhandled error: ' + ((e.reason && e.reason.message) || e.reason));
+    });
+  </script>
   <style>
 /* Customer Book — sober, enterprise-style minimal UI */
 :root {
@@ -287,6 +299,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   .db-stat { padding: 9px 10px; }
 }
 
+/* ---------- Startup screen ---------- */
+.boot { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px; background: var(--bg); }
+.boot-card { width: min(100%, 460px); text-align: center; }
+.boot-card h2 { margin-bottom: 6px; }
+.boot-card .db-sql { text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.boot-spin { width: 28px; height: 28px; margin: 0 auto 16px; border: 3px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: db-spin .8s linear infinite; }
+
 /* ---------- Responsive ---------- */
 @media (min-width: 900px) { #tab-add .card { padding: 28px; } }
 
@@ -298,17 +317,20 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* Phones: bottom tab bar, bottom-sheet modal */
 @media (max-width: 760px) {
   .topbar { position: static; min-height: 0; padding: 16px 20px; }
-  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; justify-content: space-around; gap: 0; padding: 0 8px env(safe-area-inset-bottom); border-top: 1px solid var(--line); background: var(--surface); }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; justify-content: space-around; gap: 0; padding: 0 8px env(safe-area-inset-bottom); min-height: calc(var(--nav-h) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
   .tab { flex: 1 1 0; flex-direction: column; gap: 3px; min-height: 58px; padding: 8px 4px; font-size: 11.5px; text-align: center; }
   .tab svg { width: 21px; height: 21px; }
   .tab.active { color: var(--accent); }
   .tab.active::after { left: 22%; right: 22%; top: -1px; bottom: auto; border-radius: 0 0 2px 2px; }
-  main { width: min(100% - 28px, 640px); margin: 8px auto calc(var(--nav-h) + 40px + env(safe-area-inset-bottom)); }
+  html { scroll-padding-bottom: calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)); }
+  main { width: min(100% - 28px, 640px); margin: 8px auto 0; padding-bottom: calc(var(--nav-h) + 56px + env(safe-area-inset-bottom)); }
   .banner { width: min(100% - 28px, 640px); }
   .card { padding: 20px; }
   .list { grid-template-columns: 1fr; }
   .toast { bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); }
   input, textarea, select { font-size: 16px; } /* prevents iOS zoom */
+  body:has(input:focus, textarea:focus, select:focus) .tabs { display: none; }
+  body:has(input:focus, textarea:focus, select:focus) main { padding-bottom: 40px; }
 }
 
 @media (max-width: 480px) {
@@ -338,6 +360,18 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   </style>
 </head>
 <body>
+
+  <!-- Startup screen: shown until the login or app screen appears -->
+  <div id="boot" class="boot" role="status" aria-live="polite">
+    <div class="boot-card">
+      <div class="boot-spin" id="boot-spin" aria-hidden="true"></div>
+      <h2 id="boot-title">Loading Customer Book…</h2>
+      <p class="muted small" id="boot-msg">Connecting to the app.</p>
+      <pre class="db-sql hidden" id="boot-errs"></pre>
+      <button class="btn hidden" id="boot-reload" type="button">Reload page</button>
+    </div>
+  </div>
+
 
   <!-- ============ LOGIN ============ -->
   <section id="login-view" class="login hidden">
@@ -803,6 +837,30 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
     document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
     setInterval(function () { if (!document.hidden) check(); }, AUTO_MS);
     check();
+  })();
+  </script>
+  <!-- Startup watchdog -->
+  <script>
+  (function () {
+    var boot = document.getElementById('boot'), views = [document.getElementById('login-view'), document.getElementById('app-view')];
+    function shown() { return views.some(function (v) { return v && getComputedStyle(v).display !== 'none'; }); }
+    function done() { boot.classList.add('hidden'); }
+    if (shown()) return done();
+    var mo = new MutationObserver(function () { if (shown()) { done(); mo.disconnect(); } });
+    views.forEach(function (v) { if (v) mo.observe(v, { attributes: true, attributeFilter: ['class', 'style'] }); });
+    setTimeout(function () {
+      if (shown()) return;
+      var errs = (window.__bootErrors || []).filter(function (x, i, a) { return a.indexOf(x) === i; });
+      if (typeof supabase === 'undefined') errs.unshift('The Supabase library did not load (check your internet connection).');
+      document.getElementById('boot-spin').classList.add('hidden');
+      document.getElementById('boot-title').textContent = 'The app did not start';
+      document.getElementById('boot-msg').textContent = errs.length
+        ? 'Something failed while loading. Details:'
+        : 'app.js did not show the login or app screen. Make sure config.js and app.js are in the same folder as this page.';
+      var pre = document.getElementById('boot-errs');
+      if (errs.length) { pre.textContent = errs.join('\n'); pre.classList.remove('hidden'); }
+      var b = document.getElementById('boot-reload'); b.classList.remove('hidden'); b.onclick = function () { location.reload(); };
+    }, 4000);
   })();
   </script>
 </body>
