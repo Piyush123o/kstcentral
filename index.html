@@ -233,6 +233,26 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .tpl-item .btn + .btn { margin-left: 6px; }
 .file { cursor: pointer; }
 
+/* ---------- Database connection status ---------- */
+.db-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: var(--muted); }
+[data-state="ok"] .db-dot { background: var(--s-ok); box-shadow: 0 0 0 3px var(--s-ok-bg); }
+[data-state="error"] .db-dot { background: var(--s-bad); box-shadow: 0 0 0 3px var(--s-bad-bg); }
+[data-state="warn"] .db-dot { background: var(--s-warn); box-shadow: 0 0 0 3px var(--s-warn-bg); }
+[data-state="checking"] .db-dot { animation: db-pulse 1s ease-in-out infinite; }
+@keyframes db-pulse { 50% { opacity: .3; } }
+@keyframes db-spin { to { transform: rotate(360deg); } }
+.db-chip { align-self: center; display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text-2); background: var(--surface); font-size: 12.5px; font-weight: 550; white-space: nowrap; transition: background .15s, border-color .15s; }
+.db-chip:hover { background: var(--surface-2); border-color: var(--muted); }
+.db-chip svg { width: 13px; height: 13px; color: var(--muted); }
+.db-chip[data-state="checking"] svg { animation: db-spin 1s linear infinite; }
+.db-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.db-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.db-state { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.db-label { font-size: 14px; font-weight: 600; }
+#db-detail { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .db-row { flex-direction: column; align-items: stretch; } }
+@media (max-width: 400px) { .db-chip-label { display: none; } .db-chip { padding: 4px 10px; } }
+
 /* ---------- Responsive ---------- */
 @media (min-width: 900px) { #tab-add .card { padding: 28px; } }
 
@@ -331,6 +351,12 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
           <span>Settings</span>
         </button>
       </nav>
+
+      <button id="db-chip" class="db-chip" type="button" data-state="checking" aria-label="Database status: checking. Tap to recheck." title="Recheck database connection">
+        <span class="db-dot" aria-hidden="true"></span>
+        <span class="db-chip-label" id="db-chip-label">Checking…</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      </button>
     </header>
 
     <div id="setup-banner" class="banner hidden" role="alert">
@@ -407,6 +433,23 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
       <!-- ---------- Settings ---------- -->
       <section id="tab-settings" class="hidden" aria-label="Settings">
 
+        <div class="card" id="db-card" data-state="checking">
+          <div class="card-head">
+            <h2>Database connection</h2>
+            <p class="muted small">Live status of your Supabase backend.</p>
+          </div>
+          <div class="db-row">
+            <div class="db-state">
+              <span class="db-dot" aria-hidden="true"></span>
+              <div>
+                <div class="db-label" id="db-label">Checking…</div>
+                <div class="muted small" id="db-detail">Contacting the database…</div>
+              </div>
+            </div>
+            <button class="btn" id="db-recheck" type="button">↻ Recheck connection</button>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-head">
             <h2>WhatsApp message templates</h2>
@@ -478,5 +521,92 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="./config.js?v=2"></script>
   <script src="./app.js?v=2"></script>
+
+  <!-- Database connection status (standalone; does not modify app.js) -->
+  <script>
+  (function () {
+    var TIMEOUT_MS = 8000, AUTO_MS = 60000;
+    var chip = document.getElementById('db-chip'), card = document.getElementById('db-card');
+    var chipLabel = document.getElementById('db-chip-label');
+    var label = document.getElementById('db-label'), detail = document.getElementById('db-detail');
+    var btn = document.getElementById('db-recheck');
+    var cfg = null, running = false;
+
+    function set(state, text, msg) {
+      chip.dataset.state = state; card.dataset.state = state;
+      chipLabel.textContent = text; label.textContent = text;
+      detail.textContent = msg;
+      chip.setAttribute('aria-label', 'Database status: ' + text + '. Tap to recheck.');
+      btn.disabled = chip.disabled = (state === 'checking');
+    }
+
+    /* Find the Supabase URL + key without touching app.js / config.js.
+       1) optional manual override  2) plain globals  3) read ./config.js text */
+    var URL_RE = /https:\/\/[a-z0-9-]+\.supabase\.(?:co|in)/i;
+    var KEY_RE = /(sb_publishable_[\w-]+|eyJ[\w-]+\.[\w-]+\.[\w-]+)/;
+    function fromStrings(list) {
+      var u, k;
+      list.forEach(function (s) {
+        if (!u && URL_RE.test(s)) u = s.match(URL_RE)[0];
+        if (!k && KEY_RE.test(s)) k = s.match(KEY_RE)[1];
+      });
+      return u && k ? { url: u, key: k } : null;
+    }
+    function fromGlobals() {
+      var vals = [];
+      Object.keys(window).forEach(function (n) {
+        try {
+          var v = window[n];
+          if (typeof v === 'string') vals.push(v);
+          else if (v && Object.getPrototypeOf(v) === Object.prototype)
+            for (var p in v) if (typeof v[p] === 'string') vals.push(v[p]);
+        } catch (e) {}
+      });
+      return fromStrings(vals);
+    }
+    function getConfig() {
+      if (cfg) return Promise.resolve(cfg);
+      var o = window.DB_STATUS_CONFIG;
+      if (o && o.url && o.key) return Promise.resolve(cfg = o);
+      cfg = fromGlobals();
+      if (cfg) return Promise.resolve(cfg);
+      return fetch('./config.js', { cache: 'no-store' })
+        .then(function (r) { return r.text(); })
+        .then(function (t) { return (cfg = fromStrings([t])); })
+        .catch(function () { return null; });
+    }
+
+    function check() {
+      if (running) return; running = true;
+      set('checking', 'Checking…', 'Contacting the database…');
+      getConfig().then(function (c) {
+        if (!c) return set('warn', 'Not set up', 'Could not find the Supabase URL and key in config.js.');
+        if (!navigator.onLine) return set('error', 'Offline', 'This device has no internet connection.');
+        var ctrl = new AbortController(), t0 = performance.now();
+        var timer = setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS);
+        return fetch(c.url.replace(/\/$/, '') + '/auth/v1/health', { headers: { apikey: c.key }, cache: 'no-store', signal: ctrl.signal })
+          .then(function (r) {
+            var ms = Math.round(performance.now() - t0), when = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (r.ok) set('ok', 'Connected', 'Responded in ' + ms + ' ms · checked at ' + when);
+            else if (r.status === 401 || r.status === 403) set('error', 'Key rejected', 'The server is reachable but refused the API key (HTTP ' + r.status + '). Check config.js.');
+            else set('error', 'Server error', 'The database responded with HTTP ' + r.status + '. The project may be paused or down.');
+          })
+          .catch(function (e) {
+            if (e && e.name === 'AbortError') set('error', 'Timed out', 'No response within ' + (TIMEOUT_MS / 1000) + ' seconds.');
+            else set('error', 'Unreachable', 'Could not reach the database. Check your internet connection or the project URL.');
+          })
+          .then(function () { clearTimeout(timer); });
+      }).then(function () { running = false; }, function () { running = false; });
+    }
+
+    chip.addEventListener('click', check);
+    btn.addEventListener('click', check);
+    window.addEventListener('online', check);
+    window.addEventListener('offline', check);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+    setInterval(function () { if (!document.hidden) check(); }, AUTO_MS);
+    check();
+  })();
+  </script>
 </body>
 </html>
